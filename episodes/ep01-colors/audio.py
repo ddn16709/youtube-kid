@@ -1,7 +1,7 @@
 # Synthesizes an original cheerful kids' track + sound effects, synced to the animation timeline.
 import numpy as np, wave, sys
 SR = 44100
-DUR = 24.0
+DUR = 24.5
 N = int(SR * DUR)
 rng = np.random.default_rng(3)
 
@@ -127,9 +127,9 @@ add(sfx, 0.0, whoosh(1.1), 0.35)           # balloons rising
 add(sfx, 0.05, chime(84), 0.25)            # hook text sparkle
 add(sfx, 0.3, boing(160, 560, 0.5), 0.35)  # camel jumps in
 add(sfx, 1.0, thump(), 0.55)               # lands
-add(sfx, 0.95, blip(84), 0.15)             # "guess with me" pop-in
-add(sfx, 2.55, chime(79), 0.2)             # hello
-for tStart, tPop, tEnd in [(6.0, 8.6, 10.4), (10.5, 13.1, 14.9), (15.0, 17.6, 19.4)]:
+add(sfx, 2.95, chime(79), 0.2)             # hello
+add(sfx, 5.6, blip(84), 0.15)              # guess with me
+for tStart, tPop, tEnd in [(8.3, 10.41, 12.1), (12.05, 14.12, 15.75), (15.7, 17.59, 19.45)]:
     add(sfx, tStart, whoosh(0.45), 0.25)
     add(sfx, tStart + .5, squeak(tPop - tStart - .55), 0.06)
     for k, m in enumerate([72, 74, 76]): add(sfx, tPop - 1.6 + k*.5, blip(m), 0.28)   # 3,2,1
@@ -140,7 +140,7 @@ for tStart, tPop, tEnd in [(6.0, 8.6, 10.4), (10.5, 13.1, 14.9), (15.0, 17.6, 19
     add(sfx, tEnd, thump(), 0.35)
 add(sfx, 19.5, tada(), 0.35)
 add(sfx, 19.55, whoosh(1.0), 0.2)
-add(sfx, 22.35, chime(84), 0.3)
+add(sfx, 22.55, chime(84), 0.3)
 
 def save(name, x):
     x = x / max(1e-9, np.max(np.abs(x))) * 0.98 if np.max(np.abs(x)) > 0.98 else x
@@ -151,6 +151,15 @@ def save(name, x):
 
 save('music.wav', music * 0.9)
 save('sfx.wav', sfx)
-mix = music * 0.75 + sfx
+import subprocess
+raw = subprocess.run(['ffmpeg','-loglevel','error','-i','voice/voice.mp3','-ac','1','-ar',str(SR),'-f','f32le','-'],capture_output=True,check=True).stdout
+voice = np.zeros(N); v = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+voice[:min(N,len(v))] = v[:N]
+# duck music under the voice (smoothed envelope)
+envv = np.abs(voice); k = int(0.15*SR); envv = np.convolve(envv, np.ones(k)/k, mode='same')
+duck = 1 - 0.55*np.clip(envv/0.04, 0, 1)
+duck = np.convolve(duck, np.ones(int(0.1*SR))/int(0.1*SR), mode='same')
+save('voice.wav', voice)
+mix = music * 0.7 * duck + sfx * 0.8 + voice * 1.6
 save('mix.wav', mix)
 print('ok peak', np.max(np.abs(mix)))
